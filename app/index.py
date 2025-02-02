@@ -1,27 +1,38 @@
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
 import json
+from http.server import BaseHTTPRequestHandler
+import urllib.parse
 
-app = FastAPI()
+# Load student data from the JSON file
+def load_data():
+    with open('q-vercel-python.json', 'r') as file:
+        data = json.load(file)
+    return data
 
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
+# Handler class to process incoming requests
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Parse the query parameters
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
 
-# Load marks data
-with open("q-vercel-python.json", "r") as file:  
-    marks_list = json.load(file)
-    # print(marks_list)
+        # Get 'name' parameters from the query string
+        names = query.get('name', [])
 
-# Convert list to a dictionary for fast lookup
-marks_data = {entry["name"]: entry["marks"] for entry in marks_list}
+        # Load data from the JSON file
+        data = load_data()
 
-@app.get("/app")
-def get_marks(name: list[str] = Query([])):
-    result = [marks_data.get(n, None) for n in name]
-    return {"marks": result}
+        # Prepare the result dictionary
+        result = {"marks": []}
+        for name in names:
+            # Find the marks for each name
+            for entry in data:
+                if entry["name"] == name:
+                    result["marks"].append(entry["marks"])
+
+        # Send the response header
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')  # Enable CORS for any origin
+        self.end_headers()
+
+        # Send the JSON response
+        self.wfile.write(json.dumps(result).encode('utf-8'))
